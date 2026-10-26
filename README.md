@@ -3,9 +3,9 @@
 An IT equipment register for tracking device names, categories and
 availability.
 
-Built with Python, SQLAlchemy and SQLite. A FastAPI interface for creating
-and listing equipment is planned. The repository currently includes
-standalone examples for working with equipment objects and database storage.
+Built with Python and FastAPI, with SQLAlchemy and SQLite for database
+storage exercises. The API currently provides a health endpoint;
+equipment creation and listing are the next steps.
 
 ## Getting started
 
@@ -25,6 +25,18 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
+## Running the API
+
+From the project root, with the virtual environment activated:
+
+```bash
+python -m uvicorn app.main:app --reload
+```
+
+- Health check: http://127.0.0.1:8000/health
+- Interactive documentation: http://127.0.0.1:8000/docs
+
+Stop the development server with `Ctrl+C`.
 
 ## Running the examples
 
