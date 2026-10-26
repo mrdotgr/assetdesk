@@ -2,7 +2,7 @@
 
 A practical learning handbook: from one equipment dictionary to classes, methods and the first database concepts.
 
-This is an organized course reference, not a transcript. The Python lessons build on one another. The database appendix is a reference for the next stage, not a claim that the API is implemented or that every database concept has been mastered.
+This is an organized course reference, not a transcript. The Python lessons build on one another. The database lessons include the table, saving and reading exercises. The API is a separate next step; this handbook does not claim it is implemented.
 
 ## How to use this handbook
 
@@ -34,6 +34,12 @@ Use the **BEFORE → CHANGE → AFTER** labels to spot changes that are easy to 
 18. [Bridge to database storage](#18-bridge-to-database-storage)
 19. [Original ORM exercise explained](#19-original-orm-exercise-explained)
 20. [Run and commit a checkpoint](#20-run-and-commit-a-checkpoint)
+21. [Add categories and understand indentation](#21-add-categories-and-understand-indentation)
+22. [Complete interactive database exercise](#22-complete-interactive-database-exercise)
+23. [Describe, create and save](#23-describe-create-and-save)
+24. [Sessions, requests and results](#24-sessions-requests-and-results)
+25. [Optional saving and troubleshooting](#25-optional-saving-and-troubleshooting)
+26. [Database practice and answers](#26-database-practice-and-answers)
 
 ## 1. Choose the right tool
 
@@ -630,7 +636,7 @@ Earlier: assigned
 Latest: assigned
 ```
 
-The second output is the latest reported local learning checkpoint: the instance starts assigned, and the method sets it to assigned again. This confirms that exercise was run; it does not imply the database exercise or API has been verified.
+In the second output, the instance starts assigned and the method sets it to assigned again. Section 21 extends this example with a category.
 
 ## 15. Common mistakes and syntax
 
@@ -759,7 +765,7 @@ The API handles requests and responses. Pydantic will describe and validate acce
 
 ## 19. Original ORM exercise explained
 
-**Reference for the next stage.** The foundations above are the active lessons. Do not replace the practice class with this script just to finish a checklist.
+**Optional command-line reference.** Section 22 contains the simpler interactive table exercise. This alternative uses `--add` instead of an input prompt; it is not required before beginning the API.
 
 This version follows SQLAlchemy 2.0-style ORM declarations. It needs SQLAlchemy installed; the plain class exercise does not.
 
@@ -934,7 +940,7 @@ ORDER BY id;
 
 When the file is run directly, its `__name__` is `"__main__"`, so the final condition calls `main()`. Importing it normally gives it a module name and skips that call. The module-level setup still executes on import; the guard applies specifically to the guarded `main()` call.
 
-### Expected behaviour, not yet a completed checkpoint
+### Running the optional command-line version
 
 Run from the project root after dependencies are installed:
 
@@ -966,31 +972,24 @@ python learning/class_basics.py
 git status --short
 git --no-pager diff
 
-# Select only the completed class exercise and this handbook.
-git add learning/class_basics.py docs/python-foundations.md
+# Example: select a completed handbook update.
+git add docs/python-foundations.md
 
 # Review exactly what will be recorded.
 git --no-pager diff --cached
 
 # Record and publish the verified learning checkpoint.
-git commit -m "Add Python foundations handbook and class exercise"
+git commit -m "Expand Python and database learning notes"
 git push
 ```
 
 Do not accidentally include an unverified ORM script or unrelated changes in this commit. Keep local databases, caches and the virtual environment ignored. These commands are instructions for the local project, not a statement that a commit has already been made.
 
-### Next learning gate
+### Moving into the application
 
-Before expanding the API, explain or demonstrate:
+Use these examples as references while building the API. Memorizing every library name is not a prerequisite. Practise explaining the flow, changing a small behaviour, and checking the result.
 
-- [ ] Create two Asset instances without copying a complete solution.
-- [ ] Change one instance without changing the other.
-- [ ] Read an instance through a list position.
-- [ ] Explain which values come from arguments and which use defaults.
-- [ ] Distinguish previously returned strings from current attributes.
-- [ ] Explain why an in-memory instance is not yet a saved database row.
-
-Then continue database work in small observable stages: inspect a table, create one mapped instance, insert it, and read it in a new run. Add API requests after the storage path can be followed.
+The next application checkpoint is a health endpoint. Equipment creation, listing and validation follow. The API will have its own database location and will not import these interactive exercise scripts.
 
 ### Optional references
 
@@ -1000,3 +999,357 @@ Then continue database work in small observable stages: inspect a table, create 
 - [SQLAlchemy 2.0 ORM quick start](https://docs.sqlalchemy.org/en/20/orm/quickstart.html)
 
 Use these for lookup. Reading them all is not a prerequisite for the next small exercise.
+
+## 21. Add categories and understand indentation
+
+This is an extended plain Python class, separate from the SQLAlchemy model. Earlier examples without categories remain valid as standalone lessons.
+
+```python
+class Asset:
+    def __init__(self, name, category, status="available"):
+        # Inputs on the right become stored attributes on this instance.
+        self.name = name
+        self.category = category
+        self.status = status
+
+    def change_status(self, new_status):
+        self.status = new_status
+
+    def get_status(self):
+        return self.status
+
+
+printer = Asset("Demo printer", "printer", "assigned")
+earlier_status = printer.get_status()
+printer.change_status("assigned")
+latest_status = printer.get_status()
+print("Earlier:", earlier_status)
+print("Latest:", latest_status)
+print("Category:", printer.category)
+
+keyboard = Asset("Demo keyboard", "keyboard")
+print(keyboard.name, keyboard.category, keyboard.status)
+```
+
+Output:
+
+```text
+Earlier: assigned
+Latest: assigned
+Category: printer
+Demo keyboard keyboard available
+```
+
+| Input | Where it goes |
+|---|---|
+| `"Demo keyboard"` | `name`, then `self.name` |
+| `"keyboard"` | `category`, then `self.category` |
+| Status omitted | Default `"available"`, then `self.status` |
+
+`self` refers to the particular instance receiving the method call. Use lowercase consistently: `Self` is a different name. The conventional name `self` is not a Python keyword, but changing its capitalization in only one place breaks the reference.
+
+Indentation is part of Python syntax:
+
+| Indentation in this example | Code |
+|---|---|
+| 0 spaces | `class Asset:` and the code that creates instances |
+| 4 spaces | Method definitions inside the class |
+| 8 spaces | Instructions inside those methods |
+
+If `self.name = name` is aligned with `def __init__`, it is outside the method body. Move it inside the method; do not change `self` to `Self` to fix an indentation problem.
+
+## 22. Complete interactive database exercise
+
+**File: `learning/table_basics.py`. Requires SQLAlchemy.**
+
+This is a standalone reference for the exercise developed in small steps. It does not depend on the plain Asset class above. Do not combine the two class definitions into one script.
+
+```python
+from pathlib import Path
+
+from sqlalchemy import URL, create_engine, select
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+
+
+# Locate the database beside this script, regardless of terminal location.
+SCRIPT_FOLDER = Path(__file__).resolve().parent
+DATABASE_PATH = SCRIPT_FOLDER / "table_basics.db"
+DATABASE_URL = URL.create("sqlite", database=str(DATABASE_PATH))
+
+# Prepare the object that manages database connections.
+engine = create_engine(DATABASE_URL)
+
+
+class Base(DeclarativeBase):
+    """Provide the shared mapping foundation."""
+
+
+class Asset(Base):
+    """Describe the assets table and its columns."""
+
+    __tablename__ = "assets"
+
+    # SQLite supplies an integer ID when we insert without one.
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # SQL NULL is prohibited; blank strings are not rejected here.
+    name: Mapped[str] = mapped_column(nullable=False)
+    category: Mapped[str] = mapped_column(nullable=False)
+    status: Mapped[str] = mapped_column(nullable=False)
+
+
+# Create missing tables; retain existing records.
+Base.metadata.create_all(engine)
+
+answer = input("Save a new demo laptop? Type yes or no: ")
+
+# Only this indented block depends on the answer.
+if answer == "yes":
+    laptop = Asset(
+        name="Demo laptop",
+        category="laptop",
+        status="available",
+    )
+    print("Before saving:", laptop.name, laptop.id)
+
+    with Session(engine) as session:
+        session.add(laptop)
+        session.commit()
+        print("After saving:", laptop.name, laptop.id)
+
+# Outside the if: run these instructions for either answer.
+print("Database file:", DATABASE_PATH)
+print("Table:", Asset.__tablename__)
+print("Columns:", list(Asset.__table__.columns.keys()))
+
+with Session(engine) as session:
+    # Prepare a request. This line alone does not retrieve records.
+    statement = select(Asset).order_by(Asset.id)
+
+    # Execute the request and collect its Asset objects into a list.
+    assets = session.scalars(statement).all()
+
+    print("Stored assets:", len(assets))
+    for asset in assets:
+        print(asset.id, asset.name, asset.category, asset.status)
+```
+
+Run from the project root with the virtual environment activated:
+
+```bash
+python learning/table_basics.py
+```
+
+Only the exact answer `yes` inserts a laptop. Answering `no`, entering different text, or pressing Enter skips insertion and continues to reading. Every `yes` creates a separate record; the name is not unique in this model.
+
+## 23. Describe, create and save
+
+These are separate operations:
+
+| Code | What happens |
+|---|---|
+| `DATABASE_PATH = ...` | Choose a file location; do not create it yet |
+| `URL.create(...)` | Describe the database type and location |
+| `create_engine(...)` | Prepare connection management; no connection yet |
+| `class Asset(Base): ...` | Define the table mapping in Python |
+| `__tablename__ = "assets"` | Name the mapped table |
+| `Base.metadata.create_all(engine)` | Connect and create missing tables |
+| `laptop = Asset(...)` | Create an equipment object in memory |
+| `session.add(laptop)` | Register this new object for insertion |
+| `session.commit()` | Flush pending changes and commit the transaction |
+
+For this SQLite setup, connecting creates the database file if missing. `create_all` creates missing tables, but does not automatically change existing columns to match later edits. It does not add equipment records.
+
+### Why the ID starts as None
+
+```python
+laptop = Asset(name="Demo laptop", category="laptop", status="available")
+print(laptop.name, laptop.id)
+```
+
+Before insertion, this prints:
+
+```text
+Demo laptop None
+```
+
+`None` belongs to the ID attribute only. The object exists, and the three supplied values are present.
+
+| Attribute | Before insertion | After insertion, example |
+|---|---|---|
+| `laptop.name` | Demo laptop | Demo laptop |
+| `laptop.category` | laptop | laptop |
+| `laptop.status` | available | available |
+| `laptop.id` | None | 1 |
+
+SQLite generates the ID when SQLAlchemy inserts the row, and SQLAlchemy retrieves it for the object. In this exercise, insertion happens during the flush performed by `commit()`. More generally, a flush can happen before commit, so having an ID is not by itself proof of a committed transaction.
+
+`laptop` is a variable referring to the object. It is not the object's database ID. SQLAlchemy supplies an initializer for our mapped class, so the keyword arguments work without writing our own `__init__`.
+
+## 24. Sessions, requests and results
+
+### Read the session line in English
+
+```python
+with Session(engine) as session:
+    # Database work goes here.
+    statement = select(Asset)
+    assets = session.scalars(statement).all()
+```
+
+“Create a session using our engine, call it `session`, do the indented work, then close the session when leaving the block.” The underlying connection is acquired as needed.
+
+| Piece | Role |
+|---|---|
+| `Session(engine)` | Create the ORM work session using this engine |
+| `as session` | Give us a variable referring to that session |
+| `with` | Manage cleanup when the block ends, including on an exception |
+
+The session can read, insert, update or delete. It is the code inside the block that chooses the operation. Closing it does not delete committed records. In `with Session(engine)`, closing does not automatically commit pending changes.
+
+We used two sessions to separate saving from reading. Two are not mandatory. The reading block is outside the condition so it also runs when saving is skipped.
+
+### A request is different from its answer
+
+```python
+# Prepare the request.
+statement = select(Asset).order_by(Asset.id)
+
+# Execute the request and collect the returned objects.
+assets = session.scalars(statement).all()
+```
+
+| Variable | Contents | Plain English |
+|---|---|---|
+| `statement` | A query object | “Get all assets, ordered by ID.” |
+| `assets` | A Python list of Asset objects | “Here is the equipment returned by that request.” |
+
+Preparing `statement` alone does not fetch equipment. `.order_by(Asset.id)` asks for ascending ID order by default.
+
+The second line can be expanded without changing its meaning:
+
+```python
+# Execute the request; the result provides individual Asset objects.
+result = session.scalars(statement)
+
+# Collect all returned objects into a list.
+assets = result.all()
+```
+
+For `select(Asset)`, `scalars` exposes each selected Asset object rather than a row wrapper. `.all()` collects the results; it does not perform an INSERT.
+
+Our variable names are choices. The following is equivalent:
+
+```python
+with Session(engine) as session:
+    request = select(Asset).order_by(Asset.id)
+    equipment = session.scalars(request).all()
+    for device in equipment:
+        print(device.name)
+```
+
+### Use the returned list
+
+If the query returns a laptop followed by a monitor:
+
+| Expression | Meaning |
+|---|---|
+| `assets` | The list containing both objects |
+| `assets[0]` | The laptop object |
+| `assets[1].name` | The monitor's name |
+| `len(assets)` | 2 |
+
+```python
+for asset in assets:
+    print(asset.name, asset.status)
+```
+
+On each turn, `asset` refers to one object from the list. Printing does not insert a record. If no rows match, `assets` is `[]`, its length is zero, and the loop runs zero times. Accessing `assets[0]` on an empty list raises `IndexError`.
+
+Keep attribute access inside the session in these exercises. Some ORM attributes can require further database access; do not assume every object remains fully usable after its session closes.
+
+### Do reads need add or commit?
+
+| Goal | Operations in this exercise |
+|---|---|
+| Insert new equipment | `session.add(laptop)` then `session.commit()` |
+| Read existing equipment | `session.scalars(statement).all()` |
+
+Our reading block makes no changes and needs neither `add()` nor `commit()`. A database with eight rows still has eight rows after this reading block runs three times.
+
+## 25. Optional saving and troubleshooting
+
+```mermaid
+flowchart TD
+    A["Create missing tables"] --> B["Ask whether to save"]
+    B --> C{"Answer is yes?"}
+    C -->|Yes| D["Create object and commit record"]
+    C -->|No| E["Read existing records"]
+    D --> E
+    E --> F["Print count and equipment"]
+```
+
+`input()` waits for text and Enter. `answer = ...` stores that text; `answer == "yes"` compares it with a string. Only the indented saving block depends on the comparison.
+
+### Duplicate saving block
+
+If the old saving code remains outside the condition, a yes run may print:
+
+```text
+Before saving: Demo laptop None
+After saving: Demo laptop 7
+Before saving: Demo laptop 7
+After saving: Demo laptop 7
+```
+
+The repeated ID is a clue that the same object was used again. Adding that already-saved, unchanged object to another session does not automatically insert a fresh row. Remove the leftover block; keep only the saving session inside the condition.
+
+On a fresh no run, the leftover block would try to use `laptop` even though the conditional construction did not run. That causes `NameError`. The reading query does not need that variable and should remain outside the condition.
+
+### Check persistence and optional saving
+
+Run the script three separate times. If you start with seven rows:
+
+| Run | Answer | Expected rows |
+|---|---|---|
+| First | no | 7 |
+| Second | yes | 8 |
+| Third | no | 8 |
+
+Use your actual starting count; do not delete the database just to match these numbers. The important result is unchanged count, then one extra row, then unchanged count. Only the yes run prints the before/after saving messages.
+
+### Files and project boundaries
+
+- `learning/table_basics.py` uses `learning/table_basics.db`.
+- The optional `learning/orm_basics.py` uses a different file, `learning/learning.db`.
+- Their records are separate. Running one script does not show the other's database.
+- Commit working exercises and documentation; keep generated databases and `.venv` ignored.
+- Do not import the interactive table exercise into the API: its top-level code prompts and performs database operations on import.
+- Keep README instructions concise. Put explanations, practice and troubleshooting in this handbook.
+
+## 26. Database practice and answers
+
+Try these without running the code first. Then check the answers.
+
+1. Does assigning `__tablename__ = "assets"` create the physical table?
+2. Which instruction creates missing tables?
+3. Why can `laptop.name` be present while `laptop.id` is None?
+4. Does preparing `statement` retrieve equipment?
+5. Which variable supports selecting the first returned object: `statement` or `assets`?
+6. What does `assets` contain if there are no matching records?
+7. Does a read-only query require `session.add()` or `session.commit()`?
+8. Why does reading still run after answering no?
+9. What happens when a new object with the same name is inserted again?
+10. Does `nullable=False` reject a name containing only spaces?
+
+### Answers
+
+1. No. It names the table in the mapping description.
+2. `Base.metadata.create_all(engine)`.
+3. We supplied the name but left the ID for the database to generate on insertion.
+4. No. Executing the query through the session retrieves results.
+5. `assets`, using `assets[0]` when the list is not empty.
+6. An empty list, `[]`.
+7. Neither is needed in our read-only block.
+8. Its block is outside the conditional saving block.
+9. Another row is created with its own ID; this table has no unique constraint on name.
+10. No. It rejects SQL NULL. Input validation must separately reject blank or whitespace-only text.

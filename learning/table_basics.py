@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from sqlalchemy import URL, create_engine
+from sqlalchemy import URL, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 # Find the folder containing this Python script.
@@ -18,6 +18,7 @@ DATABASE_URL = URL.create(
 # Create the object that manages database connections.
 engine = create_engine(DATABASE_URL)
 
+
 class Base(DeclarativeBase):
     """Provide SQLAlchemy's shared foundation for our mapped classes."""
 
@@ -30,36 +31,54 @@ class Asset(Base):
     # Give every stored record a unique integer identifier.
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    # Require a value in each of these text columns.
+    # These text columns cannot contain SQL NULL.
     name: Mapped[str] = mapped_column(nullable=False)
     category: Mapped[str] = mapped_column(nullable=False)
     status: Mapped[str] = mapped_column(nullable=False)
 
-# Create the tables described by our mapped classes if they are missing.
+
+# Create missing tables without deleting existing records.
 Base.metadata.create_all(engine)
 
-# Create one equipment object in Python's memory.
-laptop = Asset(
-    name="Demo laptop",
-    category="laptop",
-    status="available",
-)
+# Ask whether this run should save another fictional laptop.
+answer = input("Save a new demo laptop? Type yes or no: ")
 
-print("Before saving:", laptop.name, laptop.id)
+# Everything inside this block runs only when the answer is "yes".
+if answer == "yes":
+    # Create one equipment object in Python's memory.
+    laptop = Asset(
+        name="Demo laptop",
+        category="laptop",
+        status="available",
+    )
 
-# Open a session connected to our database.
-with Session(engine) as session:
-    # Tell this session that we want to save the laptop.
-    session.add(laptop)
+    print("Before saving:", laptop.name, laptop.id)
 
-    # Write the pending change and commit the database transaction.
-    session.commit()
+    # Save the new object as a database record.
+    with Session(engine) as session:
+        session.add(laptop)
+        session.commit()
 
-    print("After saving:", laptop.name, laptop.id)
+        print("After saving:", laptop.name, laptop.id)
 
-# Show where this exercise stores its database.
+# These instructions are outside the if, so they run either way.
 print("Database file:", DATABASE_PATH)
 
-# Inspect the table description; no database connection is made here.
+# Display the table description defined by our mapped class.
 print("Table:", Asset.__tablename__)
 print("Columns:", list(Asset.__table__.columns.keys()))
+
+# Read saved equipment whether or not we added a new laptop.
+with Session(engine) as session:
+    # Describe the request.
+    statement = select(Asset).order_by(Asset.id)
+
+    # Execute the request and collect the objects in a list.
+    assets = session.scalars(statement).all()
+
+    # Display the number of returned objects.
+    print("Stored assets:", len(assets))
+
+    # Display each object's information.
+    for asset in assets:
+        print(asset.id, asset.name, asset.category, asset.status)

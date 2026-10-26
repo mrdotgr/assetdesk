@@ -1,36 +1,24 @@
 # AssetDesk
 
-An IT equipment-register project for practicing Python backend development.
-
-AssetDesk focuses on organizing equipment records by name, category and
+An IT equipment register for tracking device names, categories and
 availability.
 
-## Current progress
+Built with Python, SQLAlchemy and SQLite. A FastAPI interface for creating
+and listing equipment is planned. The repository currently includes
+standalone examples for working with equipment objects and database storage.
 
-The project currently contains Python learning exercises:
+## Getting started
 
-- Create equipment objects with attributes and methods.
-- Define an equipment table using SQLAlchemy.
-- Create a local SQLite database and its table.
-- Save fictional equipment records using a database session.
+Development environment: Python 3.14 on Ubuntu.
 
-The API is not implemented yet.
+Clone the repository:
 
-## Learning goals
+```bash
+git clone https://github.com/mrdotgr/assetdesk-api.git
+cd assetdesk-api
+```
 
-- Understand HTTP requests and API responses.
-- Validate equipment information.
-- Work with relational databases through Python.
-- Practice Git version control through incremental development.
-
-## Development environment
-
-- Ubuntu 26.04.1 LTS
-- Python 3.14.4
-
-## Python environment setup
-
-Run these commands from the project root:
+Create a virtual environment and install the dependencies:
 
 ```bash
 python3 -m venv .venv
@@ -38,36 +26,38 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-The virtual environment keeps project dependencies separate from other
-Python environments.
+## Running the examples
 
-## Learning exercises
+The `learning/` directory contains standalone examples used during
+development.
 
-### Python classes
+### Equipment objects
 
 ```bash
 python learning/class_basics.py
 ```
 
-Practices creating equipment objects, reading their attributes and changing
-their values through methods.
+Creates equipment objects and demonstrates reading and changing their
+attributes.
 
-See [Python foundations](docs/python-foundations.md) for explanations and
-practice examples.
-
-### Database tables and saving records
+### Database storage
 
 ```bash
 python learning/table_basics.py
 ```
 
-Creates `learning/table_basics.db` and the `assets` table if they do not
-already exist, then saves one fictional laptop record.
+Creates a local SQLite database and an `assets` table if they do not exist.
 
-Each run adds another record. Existing records remain in the database.
+When prompted, enter `yes` to save a fictional laptop or `no` to list
+existing records without adding one. Each `yes` adds a separate record.
+The script then displays the saved equipment and its count.
 
-Local database files are excluded from Git.
+Records are stored in `learning/table_basics.db` and remain available
+between runs. Generated database files are excluded from version control.
 
-## Sample data
+## Development notes
 
-Examples use fictional equipment records.
+[Python foundations](docs/python-foundations.md) covers the concepts used
+in the examples.
+
+All sample equipment data is fictional.
