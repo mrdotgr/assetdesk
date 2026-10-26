@@ -73,3 +73,14 @@ between runs. Generated database files are excluded from version control.
 in the examples.
 
 All sample equipment data is fictional.
+
+## Tests
+
+Run the test suite from the project root:
+
+```bash
+python -m pytest -v
+```
+
+The schema tests cover required text fields, whitespace handling, optional
+serial numbers, status values and unexpected input fields.
