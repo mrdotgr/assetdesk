@@ -22,3 +22,17 @@ class AssetCreate(BaseModel):
     serial_number: str | None = Field(default=None, min_length=1)
 
     status: Literal["available", "assigned"] = "available"
+
+class AssetRead(BaseModel):
+    """Equipment information returned by the API."""
+
+    # Allow reading attributes from a SQLAlchemy object.
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name_alias: str
+    category: str
+    brand: str
+    serial_number: str | None
+    status: Literal["available", "assigned"]
+    created_at: str

@@ -1,8 +1,8 @@
 # AssetDesk — Python Foundations
 
-A practical learning handbook: from one equipment dictionary to classes, methods and the first database concepts.
+A practical reference for Python fundamentals, database exercises and the first AssetDesk API endpoints.
 
-This is an organized course reference, not a transcript. The Python lessons build on one another. The database lessons include the table, saving and reading exercises. The API is a separate next step; this handbook does not claim it is implemented.
+The lessons build from dictionaries and functions to classes, database sessions and API requests. Sections 1–26 cover the standalone exercises; sections 27–33 explain the application structure, validation and asset creation. The application currently has health and create endpoints. API listing is the next feature.
 
 ## How to use this handbook
 
@@ -40,6 +40,14 @@ Use the **BEFORE → CHANGE → AFTER** labels to spot changes that are easy to 
 24. [Sessions, requests and results](#24-sessions-requests-and-results)
 25. [Optional saving and troubleshooting](#25-optional-saving-and-troubleshooting)
 26. [Database practice and answers](#26-database-practice-and-answers)
+
+27. [From the exercises to the application](#27-from-the-exercises-to-the-application)
+28. [Application database configuration](#28-application-database-configuration)
+29. [Application model and generated values](#29-application-model-and-generated-values)
+30. [Input and output schemas](#30-input-and-output-schemas)
+31. [Application startup and routes](#31-application-startup-and-routes)
+32. [Creating an asset through the API](#32-creating-an-asset-through-the-api)
+33. [Tests, responses and checkpoints](#33-tests-responses-and-checkpoints)
 
 ## 1. Choose the right tool
 
@@ -749,7 +757,7 @@ In our chosen ORM approach:
 
 The plain practice class is not automatically a mapped database class. The ORM model adds SQLAlchemy-specific declarations. It also does not automatically inherit the practice methods such as `rename` or `make_available`.
 
-### Future request flow
+### Request flow: creation and planned listing
 
 ```mermaid
 flowchart TD
@@ -761,7 +769,7 @@ flowchart TD
     G --> H["Return equipment information"]
 ```
 
-The API handles requests and responses. Pydantic will describe and validate accepted/output data. A SQLAlchemy mapped model describes database storage. A list is still useful for holding multiple results; functions still organize the actions.
+The API handles requests and responses. Pydantic describes and validates accepted/output data. A SQLAlchemy mapped model describes database storage. A list is still useful for holding multiple results; functions still organize the actions.
 
 ## 19. Original ORM exercise explained
 
@@ -942,6 +950,8 @@ When the file is run directly, its `__name__` is `"__main__"`, so the final cond
 
 ### Running the optional command-line version
 
+These commands apply only if you have saved this optional reference as `learning/orm_basics.py`. The application does not require that script.
+
 Run from the project root after dependencies are installed:
 
 ```bash
@@ -989,7 +999,7 @@ Do not accidentally include an unverified ORM script or unrelated changes in thi
 
 Use these examples as references while building the API. Memorizing every library name is not a prerequisite. Practise explaining the flow, changing a small behaviour, and checking the result.
 
-The next application checkpoint is a health endpoint. Equipment creation, listing and validation follow. The API will have its own database location and will not import these interactive exercise scripts.
+The application now has a health endpoint, input schemas and an equipment creation endpoint. Sections 27–33 explain how those parts fit together. Its database is separate from the learning databases, and it does not import the interactive exercise scripts. Listing equipment through the API is the next application checkpoint.
 
 ### Optional references
 
@@ -1353,3 +1363,602 @@ Try these without running the code first. Then check the answers.
 8. Its block is outside the conditional saving block.
 9. Another row is created with its own ID; this table has no unique constraint on name.
 10. No. It rejects SQL NULL. Input validation must separately reject blank or whitespace-only text.
+
+## 27. From the exercises to the application
+
+The exercises taught individual tools. The application combines them to do one job:
+receive equipment details, check them, store a record, and return its saved details.
+
+The application code lives in `app/`. These are our organization choices, not mandatory
+Python or FastAPI filenames. Keeping separate responsibilities in separate files makes
+it easier to locate the code we need to understand or change.
+
+| File | Question it answers | Contents |
+| --- | --- | --- |
+| `app/database.py` | Where is the database and how do we connect? | Path, connection URL, engine and shared Base |
+| `app/models.py` | How is equipment stored? | The Asset class, its columns and storage rules |
+| `app/schemas.py` | What information can enter and leave the API? | AssetCreate and AssetRead |
+| `app/main.py` | What happens when a request arrives? | Application startup, routes and saving logic |
+| `tests/test_schemas.py` | Do our input rules behave as expected? | Automated validation checks |
+
+`database.py` is a Python source file. `assetdesk.db` is a SQLite data file. They are not
+two names for the same thing. We commit source code; we keep the generated database local.
+
+Our application does not import the interactive scripts in `learning/`. They remain
+separate examples and use their own database files.
+
+### One request through the application
+
+```mermaid
+flowchart TD
+    A["POST /assets: equipment JSON"] --> B{"AssetCreate accepts input?"}
+    B -->|No| C["422: invalid input"]
+    B -->|Yes| D["create_asset builds an Asset object"]
+    D --> E{"Session commits the record?"}
+    E -->|Success| F["Refresh stored values and build AssetRead"]
+    F --> G["201: return saved equipment"]
+    E -->|Duplicate serial| H["Rollback and return 409"]
+```
+
+This is the request path implemented by the current create endpoint. An unrelated database
+failure is raised for investigation; it is not converted into a duplicate-serial message.
+Listing equipment through the API is the next feature, not part of this checkpoint.
+
+### Three representations of the same equipment
+
+| Name | What it is | Why it exists |
+| --- | --- | --- |
+| `AssetCreate` | A Pydantic class | Describe acceptable creation input |
+| `equipment` | One AssetCreate object | Hold checked values from this request |
+| `Asset` | A SQLAlchemy mapped class | Describe the equipment table and mapping |
+| `asset` | One Asset object | Represent the equipment to insert and its stored values |
+| `AssetRead` | A Pydantic class | Describe the information returned to the caller |
+
+These are not three different laptops or three database rows. They describe the same
+information at different stages. The database insertion creates the stored row.
+
+### Why a class here, and a function there?
+
+Use a class when describing one of these types of data with the library's class-based
+interface. Use a function for a sequence of work, such as getting the current time or
+handling a request.
+
+`class AssetCreate(BaseModel)` means “define our class using Pydantic's BaseModel
+capabilities.” This is inheritance. We declare the fields and rules; the library supplies
+validation and construction behavior. We do not need to write our own `__init__` here.
+
+`class Asset(Base)` uses SQLAlchemy's capabilities through our shared Base instead.
+It describes database storage. Pydantic and SQLAlchemy do different jobs even though
+both use Python classes.
+
+## 28. Application database configuration
+
+**File: `app/database.py`.** These are the core declarations used by the application:
+
+```python
+from pathlib import Path
+
+from sqlalchemy import URL, create_engine
+from sqlalchemy.orm import DeclarativeBase
+
+# Locate the project folder from this module's location.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATABASE_PATH = PROJECT_ROOT / "assetdesk.db"
+
+# Describe connectivity, then create the connection-management object.
+DATABASE_URL = URL.create("sqlite", database=str(DATABASE_PATH))
+engine = create_engine(DATABASE_URL)
+
+
+class Base(DeclarativeBase):
+    """Provide the shared foundation for our database models."""
+```
+
+Read the path expression in order:
+
+| Expression | Meaning |
+| --- | --- |
+| `__file__` | This module's filename |
+| `Path(__file__)` | Represent that filename as a Path object |
+| `.resolve()` | Obtain its absolute resolved path |
+| First `.parent` | Move from database.py to its containing app folder |
+| Second `.parent` | Move from app to the project root |
+| `/ "assetdesk.db"` | Join the folder path with the database filename |
+
+The `/` operation joins path parts because the left-hand value is a Path object.
+It is not numeric division in this expression.
+
+`DATABASE_PATH` is our chosen name for that file location. Uppercase is a naming
+convention for a configuration value; it does not make the value immutable.
+
+`URL.create("sqlite", database=str(DATABASE_PATH))` tells SQLAlchemy the database system
+and its filename. This is not a website URL. `str()` converts the Path object to the text
+expected by that argument. `database=` is the name of an argument in the library function.
+
+`engine` manages connectivity to that database. Creating the engine does not insert a
+record or create the assets table. Database work opens connections when needed.
+
+`Base.metadata` collects table descriptions from mapped classes that inherit from Base.
+A table description includes names, column types and constraints. It does not contain
+our stored equipment records.
+
+The three things to distinguish are:
+
+- `DATABASE_PATH`: which file to use.
+- `engine`: how database connections are managed.
+- `Base.metadata`: the table descriptions SQLAlchemy knows about.
+
+## 29. Application model and generated values
+
+**File: `app/models.py`.** The current application model has seven columns:
+
+| Column | Meaning | Source when creating equipment |
+| --- | --- | --- |
+| `id` | Unique integer identifier | SQLite generates it during insertion |
+| `name_alias` | A useful label such as Reception laptop | Validated request input |
+| `category` | Equipment type | Validated request input |
+| `brand` | Manufacturer | Validated request input |
+| `serial_number` | Optional unique serial | Validated request input, or None |
+| `status` | available or assigned in accepted API input | Request value, or its default |
+| `created_at` | Creation time with a UTC offset | Model default during insertion |
+
+For example:
+
+```python
+# A mapped attribute and its column rule.
+name_alias: Mapped[str] = mapped_column(nullable=False)
+```
+
+`Mapped[str]` identifies a mapped text attribute. `mapped_column()` configures its column.
+`nullable=False` rejects SQL NULL, not blank text. Pydantic handles the blank-text rule.
+
+```python
+# Missing serial numbers are allowed; supplied values must be unique.
+serial_number: Mapped[str | None] = mapped_column(
+    nullable=True,
+    unique=True,
+)
+```
+
+`str | None` allows text or None in Python. `nullable=True` allows SQL NULL in SQLite.
+`unique=True` makes SQLite reject duplicate non-NULL serial numbers. SQLite allows more
+than one NULL in this unique column. Serial comparison is case-sensitive with this
+current column configuration.
+
+### Greek local creation time
+
+```python
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+
+def current_greek_time() -> str:
+    """Return Greek local time with its UTC offset."""
+    return datetime.now(ZoneInfo("Europe/Athens")).isoformat(
+        timespec="seconds"
+    )
+```
+
+`-> str` is a return type hint. The function produces text. `Europe/Athens` uses Greece's
+timezone rules, including seasonal clock changes. It is not a fixed offset all year.
+`isoformat(timespec="seconds")` formats the date and time to the second and includes the
+offset, for example `2026-10-27T16:12:59+02:00`.
+
+The mapped column uses the function like this:
+
+```python
+created_at: Mapped[str] = mapped_column(
+    nullable=False,
+    default=current_greek_time,
+)
+```
+
+There are deliberately no parentheses after `current_greek_time`. We pass the function
+so SQLAlchemy can call it when inserting a row that needs the default. Calling it while
+defining the class would calculate one timestamp too early.
+
+The current model stores this timestamp as text. A model default is applied during
+insertion; constructing an Asset object alone does not populate every generated value.
+
+## 30. Input and output schemas
+
+**File: `app/schemas.py`.** A schema here is a description of fields, types and rules.
+
+### AssetCreate: what the caller may send
+
+```python
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class AssetCreate(BaseModel):
+    """Information accepted when creating equipment."""
+
+    # Clean surrounding spaces and reject undeclared fields.
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        extra="forbid",
+    )
+
+    name_alias: str = Field(min_length=1)
+    category: str = Field(min_length=1)
+    brand: str = Field(min_length=1)
+    serial_number: str | None = Field(default=None, min_length=1)
+    status: Literal["available", "assigned"] = "available"
+```
+
+| Declaration | Plain English |
+| --- | --- |
+| `BaseModel` | Supply Pydantic's checking and construction behavior |
+| `str_strip_whitespace=True` | Remove spaces surrounding input strings |
+| `extra="forbid"` | Reject fields we did not declare |
+| `Field(min_length=1)` | Require at least one character after trimming |
+| `default=None` | Use None when the serial is omitted |
+| `Literal["available", "assigned"]` | Accept only these exact status values |
+| `= "available"` | Use available if the caller omits status |
+
+We leave ID and creation time out of this input class because the saving process supplies
+them. Combined with `extra="forbid"`, this rejects callers trying to supply an ID.
+
+Example, run independently from the project root:
+
+```python
+from app.schemas import AssetCreate
+
+# Construct checked input. This does not access or modify the database.
+equipment = AssetCreate(
+    name_alias="  Reception laptop  ",
+    category="laptop",
+    brand="Lenovo",
+)
+
+print(equipment.name_alias)     # Reception laptop
+print(equipment.serial_number)  # None
+print(equipment.status)         # available
+```
+
+The values are attributes on an object, so use `equipment.status`, not
+`equipment["status"]`. Our input object is not a dictionary.
+
+### AssetRead: what the caller receives
+
+```python
+class AssetRead(BaseModel):
+    """Equipment information returned by the API."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name_alias: str
+    category: str
+    brand: str
+    serial_number: str | None
+    status: Literal["available", "assigned"]
+    created_at: str
+```
+
+The response includes the ID and creation time. `from_attributes=True` allows Pydantic
+to read attributes from our SQLAlchemy object, such as `asset.id` and `asset.brand`.
+
+`AssetRead` does not perform a database query. It describes returned data. The session
+performs database reads; the schema checks and organizes the response values.
+
+### Why fields appear in both the model and schemas
+
+| Responsibility | Where it belongs in this application |
+| --- | --- |
+| Is the submitted alias blank? | AssetCreate |
+| What text values can status contain in a request? | AssetCreate |
+| Is this serial already stored? | Database unique constraint, handled by the route |
+| Which columns are stored? | Asset in models.py |
+| Which fields should be returned? | AssetRead |
+
+The current database model has no CHECK constraint limiting status to the two API
+values. The accepted-status rule is enforced by the input schema. This distinction
+matters when explaining what each layer does.
+
+## 31. Application startup and routes
+
+**File: `app/main.py`.** This connects the database setup, models and schemas.
+
+### Imports
+
+| Imported name | Role |
+| --- | --- |
+| `asynccontextmanager` | Adapt the lifespan function to the startup/shutdown pattern |
+| `SQLITE_CONSTRAINT_UNIQUE` | Identify SQLite's unique-value violation code |
+| `FastAPI` | Construct the web application |
+| `HTTPException` | Deliberately return an HTTP error response |
+| `IntegrityError` | Catch database integrity-rule failures reported by SQLAlchemy |
+| `Session` | Coordinate ORM work through the engine |
+| `Base`, `engine` | Reuse our database setup |
+| `Asset` | Reuse the equipment table mapping |
+| `AssetCreate`, `AssetRead` | Reuse request and response definitions |
+
+`from app.models import Asset` means “bring the Asset name from the models module in
+app into this module.” Importing the model also registers its table description with
+our shared Base before startup calls create_all.
+
+### Startup and shutdown
+
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Prepare missing tables before accepting requests.
+    Base.metadata.create_all(engine)
+    yield
+    # Release pooled connections during normal shutdown.
+    engine.dispose()
+
+
+app = FastAPI(title="AssetDesk API", lifespan=lifespan)
+```
+
+The lifespan function runs in three stages:
+
+1. Before `yield`: create missing tables.
+2. At `yield`: pause this function while the application serves requests.
+3. After `yield`: perform shutdown cleanup.
+
+`create_all` creates missing tables described by Base.metadata. It does not insert assets,
+erase existing rows, or automatically alter an existing table to match edited columns.
+The SQLite database file is created on connection if it is missing.
+
+`async def` is part of this lifecycle pattern. It does not make our regular Session
+operations asynchronous. Recognizing the startup/shutdown role is sufficient here.
+
+`app = FastAPI(...)` creates an application object. `lifespan=lifespan` passes our function
+for later use. It does not call the function immediately. The lifespan parameter named
+`app` receives that application object; this particular function does not otherwise use it.
+
+### The health route
+
+```python
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "application": "AssetDesk",
+    }
+```
+
+The decorator registers the function for GET requests to `/health`. When such a request
+arrives, FastAPI calls the function and returns its dictionary as JSON. This function
+checks that the API responds; it does not query the database.
+
+### Starting the server
+
+```bash
+python -m uvicorn app.main:app --reload
+```
+
+| Part | Meaning |
+| --- | --- |
+| `python -m uvicorn` | Run Uvicorn with the active Python environment |
+| `app.main` | Import the main module inside app |
+| `:app` | Use the FastAPI object named app inside that module |
+| `--reload` | Restart the development server when source files change |
+
+Keep the terminal running while using the API. Open `http://127.0.0.1:8000/docs` for its
+interactive documentation. The terminal shows request logs and errors. `Ctrl+C` stops
+the server. None of these commands pushes code to GitHub.
+
+## 32. Creating an asset through the API
+
+The code below is the create route from `app/main.py`. It uses the imports and application
+setup described in section 31; it is not a standalone script.
+
+```python
+@app.post("/assets", response_model=AssetRead, status_code=201)
+def create_asset(equipment: AssetCreate):
+    """Save validated equipment and return its stored details."""
+
+    # Copy checked input into an object mapped to the database table.
+    asset = Asset(
+        name_alias=equipment.name_alias,
+        category=equipment.category,
+        brand=equipment.brand,
+        serial_number=equipment.serial_number,
+        status=equipment.status,
+    )
+
+    # The session closes automatically when we leave this block.
+    with Session(engine) as session:
+        session.add(asset)
+
+        try:
+            session.commit()
+        except IntegrityError as error:
+            session.rollback()
+
+            # Recognize the duplicate-serial case for our current insert.
+            if (
+                getattr(error.orig, "sqlite_errorcode", None)
+                == SQLITE_CONSTRAINT_UNIQUE
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="An asset with this serial number already exists.",
+                ) from error
+
+            # Keep unexpected integrity failures available for investigation.
+            raise
+
+        # Load stored values and build a response while the session is open.
+        session.refresh(asset)
+        return AssetRead.model_validate(asset)
+```
+
+### A. Receive validated input
+
+`@app.post("/assets", ...)` connects the POST path to this function. A POST request carries
+information in its body. `equipment: AssetCreate` tells FastAPI to validate that body
+using our input class. If input fails, FastAPI returns 422 before running the function body.
+
+If input passes, `equipment` refers to the resulting AssetCreate instance. For example,
+`equipment.brand` reads its checked brand. `response_model=AssetRead` describes the
+response fields and types. `status_code=201` selects the successful Created response.
+
+### B. Make the database object
+
+`asset = Asset(...)` creates one ORM object in memory. In `brand=equipment.brand`, the
+right side reads input and the left side names the field on the new object.
+
+The input object and ORM object are separate. They represent the same equipment details
+but have different jobs. ID and creation time are left to insertion defaults.
+
+### C. Save it
+
+`with Session(engine) as session` creates a session, gives it the name session, and arranges
+cleanup when the block ends. It does not commit automatically.
+
+`session.add(asset)` registers the new object for insertion. `session.commit()` flushes
+pending work and commits the transaction. In this route, that is when insertion occurs.
+A transaction groups changes that can be committed together or rolled back on failure.
+
+### D. Handle a failed transaction
+
+`try` attempts the commit. `except IntegrityError as error` handles the specified exception
+and gives it a local name. `session.rollback()` resets the failed transaction. Earlier
+successfully committed assets remain stored.
+
+`error.orig` is the original database-driver exception. `getattr(..., "sqlite_errorcode",
+None)` reads its SQLite error code, or gives None if that attribute is absent. We compare
+this with `SQLITE_CONSTRAINT_UNIQUE` to recognize a unique-value violation.
+
+The serial number is the relevant unique-value constraint for this insert. We translate
+that failure into 409 Conflict. `raise HTTPException(...)` leaves the normal success path;
+FastAPI produces the error response. `from error` preserves the cause for debugging.
+
+The final bare `raise` re-raises other integrity failures. We do not label every database
+error as a duplicate serial.
+
+### E. Return the saved details
+
+`session.refresh(asset)` reads the stored row back into the object, including its generated
+values. It is not a second insertion.
+
+`AssetRead.model_validate(asset)` builds our response object from the Asset's attributes.
+The `from_attributes=True` setting enables that attribute-based reading. We build it
+inside the session block, before closing the session.
+
+`return` hands the response object to FastAPI. Exiting the with block closes the session.
+FastAPI sends the response as JSON with the 201 status.
+
+## 33. Tests, responses and checkpoints
+
+### What the schema tests check
+
+Run from the project root with the project environment active:
+
+```bash
+python -m pytest -v
+```
+
+Our current `tests/test_schemas.py` contains seven collected cases: one valid-input test
+and six invalid-input variations.
+
+| Test input | Expected behavior |
+| --- | --- |
+| Valid alias with surrounding spaces | Trim alias and apply omitted defaults |
+| Blank alias | Reject input |
+| Empty category | Reject input |
+| Blank brand | Reject input |
+| Blank serial number | Reject input |
+| Unsupported status | Reject input |
+| User-supplied ID | Reject unexpected field |
+
+`assert` checks an expected result. If the condition is false, the test fails.
+`@pytest.mark.parametrize` runs the same test function with different inputs.
+`with pytest.raises(ValidationError)` passes only when the code inside raises that
+expected validation exception.
+
+For example, the test uses `data.update(changes)` to replace one field in a valid dictionary.
+`AssetCreate(**data)` unpacks that dictionary into named arguments, such as
+`name_alias=...`, `category=...` and `brand=...`.
+
+These tests do not start the server or test database saving. Endpoint and persistence
+checks are separate. A passing test suite only demonstrates the behavior it covers.
+
+### Try the create endpoint
+
+In `/docs`, expand POST `/assets`, choose **Try it out**, and supply:
+
+```json
+{
+  "name_alias": "Reception laptop",
+  "category": "laptop",
+  "brand": "Lenovo",
+  "serial_number": "DEMO-SN-001",
+  "status": "available"
+}
+```
+
+If that serial already exists, use another fictional serial for the successful creation
+check. Sending a new serial creates a real row in the local application database.
+
+| Check | Expected response |
+| --- | --- |
+| Valid input with a new serial | 201 and the saved equipment |
+| Repeat that same serial | 409 with the duplicate message |
+| Set status to broken | 422 with validation details |
+
+A response ID identifies the saved row; it is not a count of all equipment.
+The body timestamp can use Greek local time while the HTTP Date header uses GMT.
+For example, 16:12:59+02:00 and 14:12:59 GMT describe the same instant.
+
+### Review and save a working checkpoint
+
+Testing, committing and pushing do different jobs:
+
+| Action | Purpose |
+| --- | --- |
+| Run pytest or try an endpoint | Check behavior |
+| `git add` | Select the current contents to include in the next commit |
+| `git diff --cached` | Review that selected content |
+| `git commit` | Record a local checkpoint |
+| `git push` | Publish local commits to the configured remote |
+
+Use exact filenames. `tests/test_schema.py` and `tests/test_schemas.py` are different paths.
+A test run can pass while git add fails because a filename is wrong. A failed commit
+followed by “Everything up-to-date” does not mean those edits were saved.
+
+After changing a staged file, run git add again to include the newer contents. Review the
+staged diff, not just the working file. Keep generated databases and environments ignored.
+
+### Check your understanding
+
+1. Which file defines acceptable creation input?
+2. Does AssetRead query SQLite?
+3. What is the difference between database.py and assetdesk.db?
+4. Why can we create Asset objects without writing our own initializer?
+5. Does nullable=False reject a string made only of spaces?
+6. What happens if a request supplies an unsupported status?
+7. Why do we call rollback after a failed commit?
+8. Does refresh insert another row?
+9. Does the health function inspect the database?
+10. Does create_all add a new column to an existing table after we edit the model?
+
+Answers:
+
+1. schemas.py, through AssetCreate.
+2. No; it describes and validates returned data.
+3. One contains Python connection setup; the other contains SQLite data.
+4. SQLAlchemy provides construction behavior for our mapped class.
+5. No; the input schema handles that blank-text rule.
+6. Input validation returns 422 before the route body runs.
+7. To reset the failed transaction before leaving or reusing the session.
+8. No; it reloads stored values into the existing object.
+9. No; it returns a fixed response confirming the API responds.
+10. No; changing existing table structure requires a separate deliberate step.
+
+### Further reference
+
+- [FastAPI: request bodies](https://fastapi.tiangolo.com/tutorial/body/)
+- [FastAPI: response models](https://fastapi.tiangolo.com/tutorial/response-model/)
+- [FastAPI: lifespan](https://fastapi.tiangolo.com/advanced/events/)
+- [Pydantic: models](https://docs.pydantic.dev/latest/concepts/models/)
+- [SQLAlchemy: sessions](https://docs.sqlalchemy.org/en/20/orm/session_basics.html)
+
+Use these when looking up a specific question. They are not prerequisites for continuing.

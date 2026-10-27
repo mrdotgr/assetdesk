@@ -1,15 +1,15 @@
 # AssetDesk
 
-An IT equipment register for tracking device names, categories and
-availability.
+A small IT equipment-register API built with Python, FastAPI, SQLAlchemy
+and SQLite.
 
-Built with Python and FastAPI, with SQLAlchemy and SQLite for database
-storage exercises. The API currently provides a health endpoint;
-equipment creation and listing are the next steps.
+Equipment records include an alias, category, brand, optional serial number
+and availability status. Each saved record receives an ID and a creation
+timestamp.
 
-## Getting started
+## Running the project
 
-Development environment: Python 3.14 on Ubuntu.
+Developed with Python 3.14 on Ubuntu. Run the following commands in a terminal.
 
 Clone the repository:
 
@@ -25,62 +25,77 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
-## Running the API
 
-From the project root, with the virtual environment activated:
+Start the development server:
 
 ```bash
 python -m uvicorn app.main:app --reload
 ```
 
-- Health check: http://127.0.0.1:8000/health
-- Interactive documentation: http://127.0.0.1:8000/docs
+Open the [interactive API documentation](http://127.0.0.1:8000/docs) to try
+the endpoints. Stop the server with `Ctrl+C`.
 
-Stop the development server with `Ctrl+C`.
+## API
 
-## Running the examples
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/health` | Check that the API responds. |
+| POST | `/assets` | Create an equipment record. |
 
-The `learning/` directory contains standalone examples used during
-development.
+Example request body for `POST /assets`:
 
-### Equipment objects
-
-```bash
-python learning/class_basics.py
+```json
+{
+  "name_alias": "Reception laptop",
+  "category": "laptop",
+  "brand": "Lenovo",
+  "serial_number": "DEMO-SN-001",
+  "status": "available"
+}
 ```
 
-Creates equipment objects and demonstrates reading and changing their
-attributes.
+A successful request returns `201 Created` with the saved details, including
+`id` and `created_at`.
 
-### Database storage
+Alias, category and brand are required and cannot be blank. The serial
+number can be omitted; supplied serial numbers must be nonblank and unique.
+Status accepts `available` or `assigned` and defaults to `available`.
 
-```bash
-python learning/table_basics.py
-```
+Invalid input returns `422`. A duplicate serial number returns `409`.
 
-Creates a local SQLite database and an `assets` table if they do not exist.
+## Database
 
-When prompted, enter `yes` to save a fictional laptop or `no` to list
-existing records without adding one. Each `yes` adds a separate record.
-The script then displays the saved equipment and its count.
+The application creates `assetdesk.db` in the project root and creates
+missing tables at startup. Records remain in the file between runs.
+Creation timestamps use the `Europe/Athens` timezone and include the UTC offset.
 
-Records are stored in `learning/table_basics.db` and remain available
-between runs. Generated database files are excluded from version control.
-
-## Development notes
-
-[Python foundations](docs/python-foundations.md) covers the concepts used
-in the examples.
-
-All sample equipment data is fictional.
+Database files are local and excluded from Git. The examples in `learning/`
+use separate databases.
 
 ## Tests
 
-Run the test suite from the project root:
+With the virtual environment active, run:
 
 ```bash
 python -m pytest -v
 ```
 
-The schema tests cover required text fields, whitespace handling, optional
-serial numbers, status values and unexpected input fields.
+The current tests cover input validation: required text, surrounding spaces,
+optional serial numbers, allowed statuses and unexpected fields.
+
+## Learning notes
+
+The `learning/` folder contains standalone Python and database exercises:
+
+```bash
+python learning/class_basics.py
+python learning/table_basics.py
+```
+
+The database exercise asks whether to save a demo laptop, then lists its
+stored records.
+
+[Python foundations](docs/python-foundations.md) explains the exercises,
+the application files and how an asset is validated and saved.
+
+All sample equipment data is fictional.
