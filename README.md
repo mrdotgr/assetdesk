@@ -9,7 +9,7 @@ timestamp.
 
 ## Running the project
 
-Developed with Python 3.14 on Ubuntu. Run the following commands in a terminal.
+Developed with Python 3.14 on Ubuntu.
 
 Clone the repository:
 
@@ -41,6 +41,9 @@ the endpoints. Stop the server with `Ctrl+C`.
 | --- | --- | --- |
 | GET | `/health` | Check that the API responds. |
 | POST | `/assets` | Create an equipment record. |
+| GET | `/assets` | List saved equipment in ID order. |
+
+### Create equipment
 
 Example request body for `POST /assets`:
 
@@ -63,11 +66,19 @@ Status accepts `available` or `assigned` and defaults to `available`.
 
 Invalid input returns `422`. A duplicate serial number returns `409`.
 
+### List equipment
+
+`GET /assets` returns `200 OK` with a JSON list of saved equipment, ordered
+by ID. If no records exist, it returns an empty list: `[]`.
+
 ## Database
 
 The application creates `assetdesk.db` in the project root and creates
-missing tables at startup. Records remain in the file between runs.
-Creation timestamps use the `Europe/Athens` timezone and include the UTC offset.
+missing tables at startup. Records remain available after restarting
+the server.
+
+Creation timestamps use the `Europe/Athens` timezone and include the UTC
+offset.
 
 Database files are local and excluded from Git. The examples in `learning/`
 use separate databases.

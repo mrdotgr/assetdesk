@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from sqlite3 import SQLITE_CONSTRAINT_UNIQUE
 
 from fastapi import FastAPI, HTTPException
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -75,3 +76,19 @@ def create_asset(equipment: AssetCreate):
 
         # Build the response before closing the database session.
         return AssetRead.model_validate(asset)
+
+@app.get("/assets", response_model=list[AssetRead])
+def list_assets():
+    """Return saved equipment in ID order."""
+
+    with Session(engine) as session:
+        # Describe the query, then retrieve the matching Asset objects.
+        statement = select(Asset).order_by(Asset.id)
+        assets = session.scalars(statement).all()
+
+        # Build response objects while the database session is open.
+        response = []
+        for asset in assets:
+            response.append(AssetRead.model_validate(asset))
+
+        return response
