@@ -1,112 +1,141 @@
 # AssetDesk
 
-A small IT equipment-register API built with Python, FastAPI, SQLAlchemy
-and SQLite.
+A small IT equipment register built with Python, FastAPI, SQLAlchemy,
+SQLite and React.
 
-Equipment records include an alias, category, brand, optional serial number
-and availability status. Each saved record receives an ID and a creation
-timestamp.
+Add equipment through a form, view saved records and check how many items
+are available or assigned. Each record includes an alias, category, brand,
+optional serial number, status and creation date.
 
-## Running the project
+![AssetDesk equipment register](docs/images/assetdesk.png)
 
-Developed with Python 3.14 on Ubuntu.
+## Running locally
+
+The project uses Python 3.14 and Node.js 24 with npm. The commands below
+use uv to manage the Python environment. Development has been carried out
+on Ubuntu and macOS.
+
+### First setup
 
 Clone the repository:
 
 ```bash
-git clone https://github.com/mrdotgr/assetdesk-api.git
-cd assetdesk-api
+git clone https://github.com/mrdotgr/assetdesk.git
+cd assetdesk
 ```
 
-Create a virtual environment and install the dependencies:
+If you already have a copy, open its existing folder instead of cloning
+again. Run the following commands from the project root, where `app/`,
+`frontend/` and `requirements.txt` are located.
+
+Create the Python environment if `.venv` does not already exist:
 
 ```bash
-python3 -m venv .venv
+uv venv --python 3.14 .venv
+```
+
+Install the backend dependencies:
+
+```bash
+uv pip install --python .venv/bin/python -r requirements.txt
+```
+
+This installs FastAPI, Pydantic, SQLAlchemy, Uvicorn and the other Python
+packages listed in `requirements.txt`.
+
+Install the frontend dependencies:
+
+```bash
+cd frontend
+npm ci
+cd ..
+```
+
+This installs React, Vite and the other frontend packages using the versions
+recorded in `package-lock.json`.
+
+### Start the app
+
+Keep two terminals open, both starting from the project root.
+
+In the first terminal, start the API:
+
+```bash
 source .venv/bin/activate
-python -m pip install -r requirements.txt
-```
-
-Start the development server:
-
-```bash
 python -m uvicorn app.main:app --reload
 ```
 
-Open the [interactive API documentation](http://127.0.0.1:8000/docs) to try
-the endpoints. Stop the server with `Ctrl+C`.
+In the second terminal, start the interface:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Open [AssetDesk](http://127.0.0.1:5173). The
+[API documentation](http://127.0.0.1:8000/docs) is available separately.
+Both servers must stay running while using the app.
+
+A fresh database starts empty. Use **Add equipment** to save the first
+record. Stop each server with `Ctrl+C`.
+
+For later runs, use only the start commands. Repeat dependency installation
+when `requirements.txt` or the frontend dependency files change.
 
 ## API
 
-| Method | Path | Description |
+| Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/health` | Check that the API responds. |
-| POST | `/assets` | Create an equipment record. |
 | GET | `/assets` | List saved equipment in ID order. |
+| POST | `/assets` | Create an equipment record. |
 
-### Create equipment
+Alias, category and brand are required nonblank text. Serial numbers are
+optional and must be unique when provided. Status accepts `available` or
+`assigned` and defaults to `available`.
 
-Example request body for `POST /assets`:
-
-```json
-{
-  "name_alias": "Reception laptop",
-  "category": "laptop",
-  "brand": "Lenovo",
-  "serial_number": "DEMO-SN-001",
-  "status": "available"
-}
-```
-
-A successful request returns `201 Created` with the saved details, including
-`id` and `created_at`.
-
-Alias, category and brand are required and cannot be blank. The serial
-number can be omitted; supplied serial numbers must be nonblank and unique.
-Status accepts `available` or `assigned` and defaults to `available`.
-
-Invalid input returns `422`. A duplicate serial number returns `409`.
-
-### List equipment
-
-`GET /assets` returns `200 OK` with a JSON list of saved equipment, ordered
-by ID. If no records exist, it returns an empty list: `[]`.
+A successful create request returns `201` with the saved record, including
+its generated ID and timestamp. Invalid input returns `422`; a duplicate
+serial number returns `409`.
 
 ## Database
 
-The application creates `assetdesk.db` in the project root and creates
-missing tables at startup. Records remain available after restarting
-the server.
+AssetDesk uses SQLite. There is no separate database server to install or
+start. The backend creates `assetdesk.db` in the project root and creates
+missing tables at startup.
 
-Creation timestamps use the `Europe/Athens` timezone and include the UTC
-offset.
+Records remain between runs. Creation timestamps use `Europe/Athens` with
+the applicable UTC offset. Database files are excluded from Git, so a new
+clone does not include records from another computer.
 
-Database files are local and excluded from Git. The examples in `learning/`
-use separate databases.
+## Checks
 
-## Tests
-
-With the virtual environment active, run:
+From the project root, with the Python environment active:
 
 ```bash
 python -m pytest -v
 ```
 
-The current tests cover input validation: required text, surrounding spaces,
-optional serial numbers, allowed statuses and unexpected fields.
-
-## Learning notes
-
-The `learning/` folder contains standalone Python and database exercises:
+From `frontend/`:
 
 ```bash
-python learning/class_basics.py
-python learning/table_basics.py
+npm run lint
+npm run build
 ```
 
-The database exercise asks whether to save a demo laptop, then lists its
-stored records.
+The Python tests cover input validation. The frontend commands check source
+issues and produce a build in `frontend/dist/`. Building does not publish
+the app online.
 
-[Python foundations](docs/python-foundations.md) explains the exercises,
-the application files and how an asset is validated and saved.
+## Project notes
 
-All sample equipment data is fictional.
+This version supports creating and listing equipment. Editing, deleting
+and user accounts are not included yet. Assigned is a status label; it
+does not record who has the equipment.
+
+The `learning/` folder contains standalone Python and database exercises.
+[Python foundations](docs/python-foundations.md) explains the backend
+concepts, and the [frontend guide](docs/frontend-guide.md) covers the
+interface and its API requests.
+
+All sample equipment data, including the screenshot, is fictional.

@@ -1,0 +1,46 @@
+/* Shared colours and typography. */
+:root {
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #172b3a;
+  background-color: #f3f6f8;
+  color-scheme: light;
+  --muted: #526575;
+  --border: #dce5eb;
+  --accent: #176674;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+#root {
+  min-height: 100vh;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+
+/* Make keyboard focus visible throughout the interface. */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
