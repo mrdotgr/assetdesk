@@ -30,6 +30,7 @@ class Asset(Base):
     status: Mapped[str] = mapped_column(nullable=False)
 
 
+# Read the command options, optionally save equipment, then list records.
 def main() -> None:
     # Adding equipment is explicit; the default action only lists records.
     parser = argparse.ArgumentParser(description="Practice equipment storage.")
@@ -60,6 +61,7 @@ def main() -> None:
 
     # A separate session reads records back from the database.
     with Session(engine) as session:
+        # Build and run a query that gets every asset in ID order.
         statement = select(Asset).order_by(Asset.id)
         assets = session.scalars(statement).all()
 

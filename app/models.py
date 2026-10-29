@@ -18,10 +18,13 @@ def current_greek_time() -> str:
 class Asset(Base):
     """An equipment record in the assets table."""
 
+    # Use this name for the database table that stores equipment.
     __tablename__ = "assets"
 
+    # Give each saved asset a unique identifier.
     id: Mapped[int] = mapped_column(primary_key=True)
 
+    # Require a name, category and brand for every saved asset.
     name_alias: Mapped[str] = mapped_column(nullable=False)
     category: Mapped[str] = mapped_column(nullable=False)
     brand: Mapped[str] = mapped_column(nullable=False)

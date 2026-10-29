@@ -16,9 +16,11 @@
   --accent: #176674;
 }
 
+/* Include padding and borders in each element's declared size. */
 * {
   box-sizing: border-box;
 }
+/* Remove default spacing so the application controls the page layout. */
 body {
   margin: 0;
 }
@@ -28,9 +30,11 @@ h3,
 p {
   margin: 0;
 }
+/* Make the application area at least as tall as the browser window. */
 #root {
   min-height: 100vh;
 }
+/* Use the page font for buttons and form controls. */
 button,
 input,
 select {

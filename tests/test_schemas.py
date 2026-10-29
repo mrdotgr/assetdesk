@@ -20,6 +20,7 @@ def test_valid_asset_trims_alias_and_uses_defaults():
     assert equipment.status == "available"
 
 
+# Run the same test once for each invalid input listed below.
 @pytest.mark.parametrize(
     "changes",
     [
@@ -46,6 +47,7 @@ def test_invalid_asset_is_rejected(changes):
         "category": "laptop",
         "brand": "Lenovo",
     }
+    # Replace part of the valid input with this test case's invalid value.
     data.update(changes)
 
     # The test passes only if validation rejects this input.

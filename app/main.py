@@ -13,6 +13,7 @@ from app.models import Asset
 from app.schemas import AssetCreate, AssetRead
 
 
+# Run setup before the API starts and cleanup after it stops.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Prepare missing tables before serving requests.
@@ -22,9 +23,11 @@ async def lifespan(app: FastAPI):
     engine.dispose()
 
 
+# Create the API application and connect its startup and shutdown handler.
 app = FastAPI(title="AssetDesk API", lifespan=lifespan)
 
 
+# Run the function below when a GET request arrives at /health.
 @app.get("/health")
 def health():
     """Confirm that the API responds."""
@@ -34,6 +37,7 @@ def health():
     }
 
 
+# Run the function below when a POST request arrives at /assets.
 @app.post("/assets", response_model=AssetRead, status_code=201)
 def create_asset(equipment: AssetCreate):
     """Save validated equipment and return its stored details."""
@@ -50,9 +54,12 @@ def create_asset(equipment: AssetCreate):
 
     # Keep database work inside a session that closes automatically.
     with Session(engine) as session:
+        # Mark the new asset to be inserted when the session is saved.
         session.add(asset)
 
+        # Handle database errors if saving the asset fails.
         try:
+            # Save the pending changes to the database.
             session.commit()
         except IntegrityError as error:
             # Reset the session after the failed transaction.
@@ -77,10 +84,12 @@ def create_asset(equipment: AssetCreate):
         # Build the response before closing the database session.
         return AssetRead.model_validate(asset)
 
+# Run the function below when a GET request arrives at /assets.
 @app.get("/assets", response_model=list[AssetRead])
 def list_assets():
     """Return saved equipment in ID order."""
 
+    # Open a database session that closes when this block finishes.
     with Session(engine) as session:
         # Describe the query, then retrieve the matching Asset objects.
         statement = select(Asset).order_by(Asset.id)

@@ -88,6 +88,7 @@ h1 {
   color: var(--muted);
   font-size: 14px;
 }
+/* Give action buttons a shared size and appearance. */
 .button {
   display: inline-flex;
   align-items: center;
@@ -180,6 +181,7 @@ h1 {
   color: #942d2d;
   overflow-wrap: anywhere;
 }
+/* Highlight confirmation that equipment was saved successfully. */
 .success-message {
   padding: 14px 18px;
   margin-bottom: 20px;
@@ -246,6 +248,7 @@ tbody tr:hover {
   color: var(--muted);
   white-space: nowrap;
 }
+/* Show equipment availability as a small coloured label. */
 .status-badge {
   display: inline-block;
   padding: 5px 10px;
@@ -294,6 +297,7 @@ tbody tr:hover {
   font-size: 13px;
 }
 
+/* Stack sections and reduce spacing on narrow screens. */
 @media (max-width: 640px) {
   .app {
     padding: 28px 16px;

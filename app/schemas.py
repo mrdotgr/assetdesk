@@ -14,6 +14,7 @@ class AssetCreate(BaseModel):
         extra="forbid",
     )
 
+    # Require these text fields to contain at least one character.
     name_alias: str = Field(min_length=1)
     category: str = Field(min_length=1)
     brand: str = Field(min_length=1)
@@ -21,6 +22,7 @@ class AssetCreate(BaseModel):
     # Missing serial numbers are allowed; blank strings are not.
     serial_number: str | None = Field(default=None, min_length=1)
 
+    # Accept only these two statuses and use available when none is supplied.
     status: Literal["available", "assigned"] = "available"
 
 class AssetRead(BaseModel):

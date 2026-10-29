@@ -1,5 +1,6 @@
 
 
+# Describe the information and actions shared by equipment objects.
 class Asset:
     def __init__(self, name, category, status="available"):
     # Store the name and category supplied by the caller.

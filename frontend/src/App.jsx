@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
+// Provide the starting values for a new equipment form.
 const EMPTY_FORM = {
   name_alias: "",
   category: "",
@@ -11,21 +12,26 @@ const EMPTY_FORM = {
 
 // This component owns the form values and the request to save them.
 function AssetForm({ onSaved, onCancel }) {
+  // Keep form values and save feedback in state so changes update the screen.
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // Keep references to the first input and the current submission flag.
   const firstInput = useRef(null);
   const submitting = useRef(false);
 
+  // Move keyboard focus to the first field when the form appears.
   useEffect(() => {
     firstInput.current?.focus();
   }, []);
 
+  // Update the form value whose name matches the changed input.
   function updateField(event) {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
   }
 
+  // Save the form without reloading the page or sending duplicate requests.
   async function handleSubmit(event) {
     event.preventDefault();
     if (submitting.current) return;
@@ -39,22 +45,26 @@ function AssetForm({ onSaved, onCancel }) {
       status: form.status,
     };
 
+    // Stop before saving if a required field contains only spaces.
     if (!equipment.name_alias || !equipment.category || !equipment.brand) {
       setError("Alias, category and brand cannot contain only spaces.");
       return;
     }
 
+    // Mark the save as running and clear any previous error.
     submitting.current = true;
     setSaving(true);
     setError("");
 
     try {
+      // Send the equipment details to the backend as JSON.
       const response = await fetch("/api/assets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(equipment),
       });
 
+      // Explain why the backend could not accept the equipment.
       if (!response.ok) {
         if (response.status === 409) {
           setError(
@@ -76,10 +86,12 @@ function AssetForm({ onSaved, onCancel }) {
       const savedAsset = await response.json();
       onSaved(savedAsset);
     } catch {
+      // Warn that a connection problem left the save result uncertain.
       setError(
         "Could not confirm the save. Check the backend, then cancel and refresh the list before trying again.",
       );
     } finally {
+      // Allow another submission after the request finishes.
       submitting.current = false;
       setSaving(false);
     }
@@ -95,6 +107,7 @@ function AssetForm({ onSaved, onCancel }) {
       <h3 id="form-title">New equipment</h3>
       <p className="form-hint">Alias, category and brand are required.</p>
 
+      {/* Group the equipment fields and disable them while saving. */}
       <fieldset disabled={saving}>
         <div className="form-grid">
           <div className="form-field">
@@ -157,12 +170,14 @@ function AssetForm({ onSaved, onCancel }) {
           </div>
         </div>
 
+        {/* Show a form error only when there is a message to display. */}
         {error && (
           <p className="form-error" role="alert">
             {error}
           </p>
         )}
 
+        {/* Let the user save the equipment or close the form. */}
         <div className="form-actions">
           <button className="button button-primary" type="submit">
             {saving ? "Saving…" : "Save equipment"}
@@ -180,18 +195,22 @@ function AssetForm({ onSaved, onCancel }) {
   );
 }
 
+// Display the equipment register and coordinate the list and new-item form.
 function App() {
+  // Keep loaded equipment and page feedback in state to update the display.
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [success, setSuccess] = useState("");
+  // Remember the Add equipment button so focus can return to it.
   const addButton = useRef(null);
 
   // Load saved equipment when the page opens; cancel if it is removed.
   useEffect(() => {
     const controller = new AbortController();
 
+    // Request the saved equipment and show an error if loading fails.
     async function loadAssets() {
       try {
         const response = await fetch("/api/assets", {
@@ -225,11 +244,13 @@ function App() {
     (asset) => asset.status === "assigned",
   ).length;
 
+  // Hide the form and return keyboard focus to the Add equipment button.
   function closeForm() {
     setShowForm(false);
     addButton.current?.focus();
   }
 
+  // Add the saved asset to the list and show a confirmation message.
   function handleSaved(asset) {
     setAssets((current) => [...current, asset]);
     setSuccess(`${asset.name_alias} was added.`);
@@ -238,6 +259,7 @@ function App() {
 
   return (
     <main className="app">
+      {/* Show the application name and a short description. */}
       <header className="page-header">
         <div className="brand-mark" aria-hidden="true">
           AD
@@ -251,6 +273,7 @@ function App() {
         </div>
       </header>
 
+      {/* Show equipment totals after the list loads successfully. */}
       {!loading && !error && (
         <section className="summary" aria-label="Equipment summary">
           <div className="summary-card">
@@ -268,12 +291,14 @@ function App() {
         </section>
       )}
 
+      {/* Confirm a successful save when a confirmation message exists. */}
       {success && (
         <p className="success-message" role="status">
           {success}
         </p>
       )}
 
+      {/* Group the equipment actions, form and saved records. */}
       <section className="equipment-panel" aria-labelledby="equipment-title">
         <div className="panel-heading">
           <div>
@@ -296,14 +321,17 @@ function App() {
           </button>
         </div>
 
+        {/* Open the form only after the user chooses to add equipment. */}
         {showForm && <AssetForm onSaved={handleSaved} onCancel={closeForm} />}
 
+        {/* Tell the user when the equipment request is still running. */}
         {loading && (
           <p className="message" role="status">
             Loading equipment…
           </p>
         )}
 
+        {/* Offer a page reload when loading the equipment fails. */}
         {error && (
           <div className="error-message">
             <p role="alert">{error}</p>
@@ -317,6 +345,7 @@ function App() {
           </div>
         )}
 
+        {/* Explain how to get started when no equipment has been saved. */}
         {!loading && !error && assets.length === 0 && (
           <div className="message empty-state">
             <h3>No equipment yet</h3>
@@ -324,6 +353,7 @@ function App() {
           </div>
         )}
 
+        {/* Show the equipment table after records load successfully. */}
         {!loading && !error && assets.length > 0 && (
           <div
             className="table-container"
@@ -343,6 +373,7 @@ function App() {
                 </tr>
               </thead>
               <tbody>
+                {/* Create one table row for each saved asset. */}
                 {assets.map((asset) => (
                   <tr key={asset.id}>
                     <td>
