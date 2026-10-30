@@ -3,7 +3,7 @@
 from contextlib import asynccontextmanager
 from sqlite3 import SQLITE_CONSTRAINT_UNIQUE
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -101,3 +101,80 @@ def list_assets():
             response.append(AssetRead.model_validate(asset))
 
         return response
+
+
+# Run the function below when a PUT request arrives for one asset ID.
+@app.put("/assets/{asset_id}", response_model=AssetRead)
+def update_asset(asset_id: int, equipment: AssetCreate):
+    """Update existing equipment and return its stored details."""
+
+    # Open a database session that closes when this block finishes.
+    with Session(engine) as session:
+        # Find the asset by its primary key.
+        asset = session.get(Asset, asset_id)
+
+        # Return a not-found response when the asset does not exist.
+        if asset is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Asset not found.",
+            )
+
+        # Replace the editable fields without changing the ID or creation time.
+        asset.name_alias = equipment.name_alias
+        asset.category = equipment.category
+        asset.brand = equipment.brand
+        asset.serial_number = equipment.serial_number
+        asset.status = equipment.status
+
+        # Handle database errors if saving the asset fails.
+        try:
+            # Save the pending changes to the database.
+            session.commit()
+        except IntegrityError as error:
+            # Reset the session after the failed transaction.
+            session.rollback()
+
+            # Return a conflict when another asset uses this serial number.
+            if (
+                getattr(error.orig, "sqlite_errorcode", None)
+                == SQLITE_CONSTRAINT_UNIQUE
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="An asset with this serial number already exists.",
+                ) from error
+
+            # Preserve other integrity errors for investigation.
+            raise
+
+        # Reload the saved values from the database.
+        session.refresh(asset)
+
+        # Build the response before closing the database session.
+        return AssetRead.model_validate(asset)
+
+
+# Run the function below when a DELETE request arrives for one asset ID.
+@app.delete("/assets/{asset_id}", status_code=204, response_class=Response)
+def delete_asset(asset_id: int):
+    """Delete one saved asset."""
+
+    # Open a database session that closes when this block finishes.
+    with Session(engine) as session:
+        # Find the asset by its primary key.
+        asset = session.get(Asset, asset_id)
+
+        # Return a not-found response when the asset does not exist.
+        if asset is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Asset not found.",
+            )
+
+        # Delete only this asset and save the change to the database.
+        session.delete(asset)
+        session.commit()
+
+        # Return an empty response to confirm successful deletion.
+        return Response(status_code=204)

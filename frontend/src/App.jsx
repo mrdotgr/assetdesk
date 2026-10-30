@@ -10,10 +10,25 @@ const EMPTY_FORM = {
   status: "available",
 };
 
+// Build empty values for adding or current values for editing.
+function getFormValues(asset) {
+  if (!asset) return EMPTY_FORM;
+
+  return {
+    name_alias: asset.name_alias,
+    category: asset.category,
+    brand: asset.brand,
+    serial_number: asset.serial_number ?? "",
+    status: asset.status,
+  };
+}
+
 // This component owns the form values and the request to save them.
-function AssetForm({ onSaved, onCancel }) {
+function AssetForm({ asset, onSaved, onCancel, onSavingChange }) {
+  const editing = Boolean(asset);
+
   // Keep form values and save feedback in state so changes update the screen.
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(() => getFormValues(asset));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   // Keep references to the first input and the current submission flag.
@@ -56,19 +71,30 @@ function AssetForm({ onSaved, onCancel }) {
     setSaving(true);
     setError("");
 
+    // Keep Add and Edit buttons disabled until the save finishes.
+    onSavingChange(true);
+
     try {
       // Send the equipment details to the backend as JSON.
-      const response = await fetch("/api/assets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(equipment),
-      });
+      // Use PUT for an existing asset and POST for new equipment.
+      const response = await fetch(
+        editing ? `/api/assets/${asset.id}` : "/api/assets",
+        {
+          method: editing ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(equipment),
+        },
+      );
 
       // Explain why the backend could not accept the equipment.
       if (!response.ok) {
         if (response.status === 409) {
           setError(
             "That serial number is already registered. Check it and try again.",
+          );
+        } else if (editing && response.status === 404) {
+          setError(
+            "This equipment no longer exists. Cancel and refresh the list.",
           );
         } else if (response.status === 422) {
           setError(
@@ -94,6 +120,7 @@ function AssetForm({ onSaved, onCancel }) {
       // Allow another submission after the request finishes.
       submitting.current = false;
       setSaving(false);
+      onSavingChange(false);
     }
   }
 
@@ -104,7 +131,9 @@ function AssetForm({ onSaved, onCancel }) {
       aria-labelledby="form-title"
       onSubmit={handleSubmit}
     >
-      <h3 id="form-title">New equipment</h3>
+      <h3 id="form-title">
+        {editing ? "Edit equipment" : "New equipment"}
+      </h3>
       <p className="form-hint">Alias, category and brand are required.</p>
 
       {/* Group the equipment fields and disable them while saving. */}
@@ -180,7 +209,11 @@ function AssetForm({ onSaved, onCancel }) {
         {/* Let the user save the equipment or close the form. */}
         <div className="form-actions">
           <button className="button button-primary" type="submit">
-            {saving ? "Saving…" : "Save equipment"}
+            {saving
+              ? "Saving…"
+              : editing
+                ? "Save changes"
+                : "Save equipment"}
           </button>
           <button
             className="button button-secondary"
@@ -202,7 +235,16 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
+  // Store the selected asset, or null when adding new equipment.
+  const [editingAsset, setEditingAsset] = useState(null);
+  // Let the form lock Add and Edit buttons while a save is running.
+  const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
+  // Track deletion progress and errors without hiding the equipment list.
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  // Block repeated deletion requests before React updates the buttons.
+  const deletingRequest = useRef(false);
   // Remember the Add equipment button so focus can return to it.
   const addButton = useRef(null);
 
@@ -247,14 +289,81 @@ function App() {
   // Hide the form and return keyboard focus to the Add equipment button.
   function closeForm() {
     setShowForm(false);
+    setEditingAsset(null);
     addButton.current?.focus();
   }
 
+  // Open the form with the selected asset's current values.
+  function openEditForm(asset) {
+    setSuccess("");
+    setDeleteError("");
+    setEditingAsset(asset);
+    setShowForm(true);
+  }
+
   // Add the saved asset to the list and show a confirmation message.
+  // Replace the matching item instead when an existing asset was edited.
   function handleSaved(asset) {
-    setAssets((current) => [...current, asset]);
-    setSuccess(`${asset.name_alias} was added.`);
+    if (editingAsset) {
+      setAssets((current) =>
+        current.map((item) => (item.id === asset.id ? asset : item)),
+      );
+      setSuccess(`${asset.name_alias} was updated.`);
+    } else {
+      setAssets((current) => [...current, asset]);
+      setSuccess(`${asset.name_alias} was added.`);
+    }
     closeForm();
+  }
+
+  // Confirm permanent deletion before sending any request to the backend.
+  async function handleDelete(asset) {
+    if (saving || deletingRequest.current || showForm) return;
+
+    const confirmed = window.confirm(
+      `Delete "${asset.name_alias}"? This deletion is permanent.`,
+    );
+    if (!confirmed) return;
+
+    // Lock all row actions and clear feedback from previous requests.
+    deletingRequest.current = true;
+    setDeleting(true);
+    setDeleteError("");
+    setSuccess("");
+
+    try {
+      // Ask the backend to delete only the selected asset.
+      const response = await fetch(`/api/assets/${asset.id}`, {
+        method: "DELETE",
+      });
+
+      // Keep the row and explain why the server could not delete it.
+      if (!response.ok) {
+        if (response.status === 404) {
+          setDeleteError(
+            "This equipment no longer exists. Refresh the list to update it.",
+          );
+        } else {
+          setDeleteError(
+            "The server could not delete the equipment. Please try again later.",
+          );
+        }
+        return;
+      }
+
+      // Remove the row after success without reading JSON from the empty response.
+      setAssets((current) => current.filter((item) => item.id !== asset.id));
+      setSuccess(`${asset.name_alias} was deleted.`);
+    } catch {
+      // Keep the row when a connection problem leaves the result uncertain.
+      setDeleteError(
+        "Could not confirm the deletion. Refresh the list before trying again.",
+      );
+    } finally {
+      // Unlock the actions after the deletion request finishes.
+      deletingRequest.current = false;
+      setDeleting(false);
+    }
   }
 
   return (
@@ -309,11 +418,13 @@ function App() {
             ref={addButton}
             className="button button-primary"
             type="button"
-            disabled={loading || Boolean(error)}
+            disabled={loading || Boolean(error) || saving || deleting}
             aria-expanded={showForm}
             aria-controls="asset-form"
             onClick={() => {
               setSuccess("");
+              setDeleteError("");
+              setEditingAsset(null);
               setShowForm(true);
             }}
           >
@@ -322,7 +433,16 @@ function App() {
         </div>
 
         {/* Open the form only after the user chooses to add equipment. */}
-        {showForm && <AssetForm onSaved={handleSaved} onCancel={closeForm} />}
+        {/* Recreate the form when switching between adding and editing assets. */}
+        {showForm && (
+          <AssetForm
+            key={editingAsset ? `edit-${editingAsset.id}` : "add"}
+            asset={editingAsset}
+            onSaved={handleSaved}
+            onCancel={closeForm}
+            onSavingChange={setSaving}
+          />
+        )}
 
         {/* Tell the user when the equipment request is still running. */}
         {loading && (
@@ -343,6 +463,13 @@ function App() {
               Try again
             </button>
           </div>
+        )}
+
+        {/* Show deletion errors without removing any rows from the display. */}
+        {deleteError && (
+          <p className="error-message" role="alert">
+            {deleteError}
+          </p>
         )}
 
         {/* Explain how to get started when no equipment has been saved. */}
@@ -370,6 +497,7 @@ function App() {
                   <th scope="col">Serial number</th>
                   <th scope="col">Status</th>
                   <th scope="col">Added</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -402,6 +530,26 @@ function App() {
                           },
                         )}
                       </time>
+                    </td>
+                    {/* Open this asset in the shared equipment form. */}
+                    <td>
+                      <button
+                        className="button button-secondary table-action"
+                        type="button"
+                        disabled={saving || deleting}
+                        onClick={() => openEditForm(asset)}
+                      >
+                        Edit
+                      </button>
+                      {/* Allow deletion only when no form or request is active. */}
+                      <button
+                        className="button button-secondary table-action"
+                        type="button"
+                        disabled={saving || deleting || showForm}
+                        onClick={() => handleDelete(asset)}
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))}
